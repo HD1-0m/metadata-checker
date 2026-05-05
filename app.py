@@ -30,9 +30,13 @@ def home():
 @app.route("/check", methods=["POST"])
 def check_image():
     if "file" not in request.files:
-        return "No file uploaded"
+        return "<h3>No file uploaded</h3>"
 
     file = request.files["file"]
+
+    if file.filename == "":
+        return "<h3>No file selected</h3>"
+
     filepath = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(filepath)
 
@@ -40,9 +44,27 @@ def check_image():
         result = subprocess.run(
             ["python3", "metadata_checker.py", filepath],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=15
         )
-        return f"<pre>{result.stdout}</pre>"
+
+        output = result.stdout.strip()
+        error = result.stderr.strip()
+
+        if error:
+            return f"<h3>Error:</h3><pre>{error}</pre>"
+
+        if not output:
+            return "<h3>No metadata found or script returned no output.</h3>"
+
+        return f"<h3>Result:</h3><pre>{output}</pre>"
+
+    except subprocess.TimeoutExpired:
+        return "<h3>Error: Script took too long (timeout)</h3>"
+
+    except Exception as e:
+        return f"<h3>Unexpected error:</h3><pre>{str(e)}</pre>"
+
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
